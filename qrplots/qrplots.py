@@ -41,6 +41,9 @@ class QRPlots:
         self.data_rev = self._reverse_mask()
         self.text = qr_text
 
+        assert self.codification_mode() == 4, "Only codification mode 4 is supported (byte encoding). \
+                                               Please, provide only ascii text."
+
     """
     It colors the fixed QR pixels. These pixels are normally used as reference to read the code.
     
@@ -162,6 +165,25 @@ class QRPlots:
         return int("".join(('1' if val == QRPlots.C_FRONT else '0' for val in self.data[8][2:5])), 2)
 
     """
+    :returns: Length of the message contained in the QR.
+    """
+    def msg_len(self):
+        len_bin = ""
+        for i in range(4):
+            len_bin += "".join(map(str, self.data_rev[-6+i][-2:]))
+
+        return int(len_bin[::-1], 2)
+
+    """
+    :returns: Codification mode.
+    """
+    def codification_mode(self):
+        cod_mode = "".join(map(str, self.data_rev[-2][-2:]))
+        cod_mode += "".join(map(str, self.data_rev[-1][-2:]))
+
+        return int(cod_mode[::-1], 2)
+
+    """
     Shows the original QR code.
 
     :param size: size in inches of the resulting image.
@@ -278,5 +300,6 @@ class QRPlots:
 
 
 if __name__ == '__main__':
-    qre = QRPlots("hey there")
-    qre.plot_mask()
+    qrp = QRPlots("hey there")
+    qrp.plot_reversed()
+    print(qrp.codification_mode())
