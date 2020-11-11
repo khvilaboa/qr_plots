@@ -158,6 +158,94 @@ class QRPlots:
 
         return data
 
+    def _color_error_pixels(self):
+        data = self._color_cfg_pixels(self._reverse_mask())
+        for byte in self._iter_bytes(data, limit=self.msg_len()):
+            print(byte, chr(int(byte, 2)))
+
+    def _iter_blocks(self, data):
+        row = len(data) - 8
+        col = len(data) - 2
+        up = True
+
+        while True:
+            top = [data[row][col], data[row][col + 1]]
+            bottom = [data[row + 1][col], data[row + 1][col + 1]]
+            yield (row, col), [top, bottom]
+
+            if up:
+                if row > 0:
+                    if data[row-1][col] == QRPlots.C_FIX_BACK:
+                        if data[row-2][col] == QRPlots.C_FIX_BACK:
+                            if col == 0:
+                                break
+                            else:
+                                up = False
+                                col -= 2 if data[row][col - 1] != QRPlots.C_FIX_BACK else 3
+                        else:
+                            row -= 3
+                    else:
+                        row -= 2
+                elif col > 0:
+                    up = False
+                    if data[row][col - 2] == QRPlots.C_FIX_BACK:
+                        row += 9
+                    col -= 2
+                else:
+                    break
+            else:  # down
+                if row + 2 < len(data):
+                    if data[row+2][col] == QRPlots.C_FIX_BACK:
+                        if data[row+3][col] == QRPlots.C_FIX_BACK:
+                            if col == 0:
+                                break
+                            else:
+                                col -= 2 if data[row][col - 1] != QRPlots.C_FIX_BACK else 3
+                        else:
+                            row += 3
+                    else:
+                        row += 2
+                elif col > 0:
+                    up = True
+                    if data[row][col - 2] == QRPlots.C_FIX_BACK:
+                        row -= 8
+                    col -= 2
+                else:
+                    break
+
+    def _iter_bytes(self, data, limit=None):
+        prev_row = None
+        prev_col = None
+        prev_block = None
+        up = True
+
+        for i, ((row, col), block) in enumerate(self._iter_blocks(data)):
+            if limit is not None and i >= 2*limit:
+                break
+
+            if prev_block is None:
+                prev_block = block
+            else:
+                if prev_col == col:
+                    if prev_row > row:
+                        byte = "".join(map(str, [val for row in block + prev_block for val in row]))
+                        up = True
+                    else:
+                        byte = prev_block + block
+                        byte = "".join(map(str, [val for i in range(len(byte)-1, -1, -1) for val in byte[i]]))
+                        up = False
+                else:
+                    if up:
+                        byte = "".join(map(str, [val for row in block[::-1] + prev_block for val in row]))
+                    else:
+                        byte = "".join(map(str, [val for row in block + prev_block[::-1] for val in row]))
+
+                prev_block = None
+                yield byte[::-1]
+
+            prev_row = row
+            prev_col = col
+
     """
     :returns: Mask ID contained in the configuration pixels. 
     """
@@ -301,5 +389,5 @@ class QRPlots:
 
 if __name__ == '__main__':
     qrp = QRPlots("hey there")
-    qrp.plot_reversed()
-    print(qrp.codification_mode())
+    qrp._color_error_pixels()
+    #print(qrp.codification_mode())
